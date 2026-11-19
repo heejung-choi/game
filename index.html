@@ -2,17 +2,67 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>구름 솜 토리의 놀이시간</title>
 <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
 <style>
   html,body{margin:0;height:100%;background:#2b2440;overflow:hidden}
   body{display:flex;align-items:center;justify-content:center}
   canvas{width:min(96vw,calc(96vh*16/9));height:auto;border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,.45);background:#fbe9d0}
+  body.touch{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+
+  /* 휴대폰 터치 버튼 */
+  #pad{display:none;position:fixed;left:0;right:0;bottom:0;flex-direction:column;gap:8px;
+       padding:8px max(16px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));pointer-events:none}
+  body.touch #pad{display:flex}
+  #pad .row{display:flex;justify-content:space-between;align-items:flex-end}
+  #pad .row.top{justify-content:center;gap:6px}
+  #pad .grp{display:flex;gap:12px;align-items:flex-end}
+  #pad button{pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent;border:none;
+       font-family:"Jua","Apple SD Gothic Neo",sans-serif;color:#5a4636;cursor:pointer}
+  .btn{width:66px;height:66px;border-radius:50%;background:rgba(255,250,243,.6);font-size:24px;
+       box-shadow:0 4px 0 rgba(90,70,54,.35);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+       display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+  .btn span{font-size:12px;margin-top:2px}
+  .btn.on{transform:translateY(3px);box-shadow:0 1px 0 rgba(90,70,54,.35);background:rgba(255,250,243,.9)}
+  .btn.big{width:80px;height:80px;font-size:21px;color:#fff;background:var(--c,#5c7c9a)}
+  .btn.big.on{filter:brightness(1.12)}
+  .pick{padding:6px 14px;border-radius:999px;background:rgba(255,250,243,.65);font-size:15px}
+  .pick.sel{background:var(--c);color:#fff !important}
+  #mute{padding:6px 10px;border-radius:999px;background:rgba(255,250,243,.65);font-size:14px}
+  #hint{display:none;position:fixed;top:calc(10px + env(safe-area-inset-top));left:0;right:0;text-align:center;
+        color:#fbe9d0;font:15px "Jua","Apple SD Gothic Neo",sans-serif;opacity:.85}
+  @media (orientation:portrait){ body.touch #hint{display:block} }
+  @media (orientation:landscape){
+    #pad .row.top{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));gap:4px}
+    .pick,#mute{padding:4px 10px !important;font-size:13px !important;background:rgba(255,250,243,.5) !important}
+    .pick.sel{background:var(--c) !important}
+    .btn{width:58px;height:58px;font-size:21px}
+    .btn.big{width:70px;height:70px;font-size:19px}
+  }
 </style>
 </head>
 <body>
 <canvas id="c" width="960" height="540"></canvas>
+<div id="hint">📱 가로로 돌리면 더 크게 보여요</div>
+<div id="pad">
+  <div class="row top">
+    <button class="pick" data-i="0">구름 오빠</button>
+    <button class="pick" data-i="1">솜 동생</button>
+    <button class="pick" data-i="2">토리 막내</button>
+    <button id="mute">소리 켬</button>
+  </div>
+  <div class="row">
+    <div class="grp">
+      <button class="btn" data-k="l">◀</button>
+      <button class="btn" data-k="r">▶</button>
+    </div>
+    <div class="grp">
+      <button class="btn" data-k="d">♥<span>부비</span></button>
+      <button class="btn big" data-k="u">점프</button>
+    </div>
+  </div>
+</div>
 <script>
 const cv = document.getElementById('c'); let ctx = cv.getContext('2d'); const mainCtx = ctx;
 const W = 960, H = 540, FLOOR = 480, G = 1800, ROUND = 90;
@@ -47,6 +97,8 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyM') muted = !muted;
 });
 addEventListener('keyup', e => keys[e.code] = false);
+document.addEventListener('contextmenu', e => { if (isTouch) e.preventDefault(); });
+document.addEventListener('dblclick', e => e.preventDefault());
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 cv.addEventListener('pointerdown', () => { initAudio(); if (state !== 'play') startGame(); });
 
@@ -109,6 +161,48 @@ function resetPets(){
   for (const p of pets){ p.y = FLOOR; p.dir = p.x < W/2 ? 1 : -1; }
 }
 resetPets();
+setTimeout(() => setCtrl(ctrl));
+
+// ---------- 휴대폰 터치 버튼 ----------
+let isTouch = false;
+function enableTouch(){ isTouch = true; document.body.classList.add('touch'); }
+if (matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 || 'ontouchstart' in window || /[?&]touch/.test(location.search)) enableTouch();
+addEventListener('touchstart', () => { if (!isTouch) enableTouch(); }, {passive:true});
+let ctrl = 0;
+try { ctrl = clamp(parseInt(localStorage.getItem('ctrlPet')) || 0, 0, 2); } catch(e){}
+function setCtrl(i){
+  for (const k of Object.values(pets[ctrl].keys)) keys[k] = false;
+  document.querySelectorAll('.btn.on').forEach(b => b.classList.remove('on'));
+  ctrl = i;
+  document.querySelectorAll('.pick').forEach(b => {
+    const p = pets[+b.dataset.i];
+    b.style.setProperty('--c', p.color); b.style.color = p.color;
+    b.classList.toggle('sel', +b.dataset.i === ctrl);
+  });
+  document.querySelector('.btn.big').style.setProperty('--c', pets[ctrl].color);
+  try { localStorage.setItem('ctrlPet', ctrl); } catch(e){}
+}
+document.querySelectorAll('.pick').forEach(b => b.addEventListener('pointerdown', e => {
+  e.preventDefault(); initAudio(); setCtrl(+b.dataset.i); say(pets[ctrl], '내가 할게!');
+}));
+const muteBtn = document.getElementById('mute');
+muteBtn.addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); muted = !muted; muteBtn.textContent = muted ? '소리 끔' : '소리 켬'; });
+document.querySelectorAll('.btn').forEach(b => {
+  const k = b.dataset.k;
+  const down = e => {
+    e.preventDefault(); initAudio();
+    if (state !== 'play'){ startGame(); return; }
+    try { b.setPointerCapture(e.pointerId); } catch(_){}
+    b.classList.add('on');
+    const code = pets[ctrl].keys[k];
+    if (!keys[code]) pressed[code] = true;
+    keys[code] = true;
+    if (navigator.vibrate && k === 'u') navigator.vibrate(8);
+  };
+  const up = () => { b.classList.remove('on'); keys[pets[ctrl].keys[k]] = false; };
+  b.addEventListener('pointerdown', down);
+  for (const ev of ['pointerup','pointercancel','lostpointercapture']) b.addEventListener(ev, up);
+});
 
 // ---------- 장난감 ----------
 const TYPES = {
@@ -665,7 +759,7 @@ function drawDog(c, st){
 function drawLabel(c){
   const s = c.size, x = c.x, y = c.y - 80*s;
   ctx.font = `15px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const txt = `${c.name} (${c.tag})` + (c.ai ? ' · 자동' : '');
+  const txt = `${c.name} (${c.tag})` + (isTouch && c === pets[ctrl] ? ' · 나' : c.ai ? ' · 자동' : '');
   const w = ctx.measureText(txt).width + 16;
   ctx.fillStyle = c.color; rr(x-w/2, y-11, w, 22, 11); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.fillText(txt, x, y+1);
@@ -718,12 +812,18 @@ function drawTitle(){
   drawOverlay([
     ['구름 · 솜 · 토리의 놀이시간', 38, '#5a4636', 44],
     ['구름 오빠 (아메리칸숏헤어 6살) · 솜 동생 (데본렉스 폴드) · 토리 막내 (말티푸 5살)', 15, '#8a6a55', 44],
-    ['구름 오빠:  A D 이동 · W 점프 · S 부비부비/내려가기', 19, pets[0].color, 32],
-    ['솜 동생:  ← → 이동 · ↑ 점프 · ↓ 부비부비/내려가기', 19, pets[1].color, 32],
-    ['토리 막내:  J L 이동 · I 점프 · K 부비부비/내려가기', 19, pets[2].color, 42],
+    ...(isTouch ? [
+      ['아래 버튼에서 조종할 친구를 골라요', 20, '#5a4636', 34],
+      [`지금은 ${pets[ctrl].name} ${pets[ctrl].tag}!  ◀ ▶ 이동 · 점프 · ♥ 부비부비/내려가기`, 19, pets[ctrl].color, 30],
+      ['나머지 친구들은 알아서 같이 놀아요', 16, '#8a6a55', 42],
+    ] : [
+      ['구름 오빠:  A D 이동 · W 점프 · S 부비부비/내려가기', 19, pets[0].color, 32],
+      ['솜 동생:  ← → 이동 · ↑ 점프 · ↓ 부비부비/내려가기', 19, pets[1].color, 32],
+      ['토리 막내:  J L 이동 · I 점프 · K 부비부비/내려가기', 19, pets[2].color, 42],
+    ]),
     ['실뭉치 10 · 생선 15 · 쥐돌이 25 · 빨간 점 30 · 츄르 40', 16, '#8a6a55', 26],
     ['붙어서 부비부비하면 하트 +5! 조작 안 하는 친구는 알아서 놀아요', 16, '#8a6a55', 46],
-    [Math.sin(time*4) > -0.3 ? '스페이스 / 엔터 / 클릭으로 시작!' : '', 25, '#d0708a', 0],
+    [Math.sin(time*4) > -0.3 ? (isTouch ? '화면을 터치해서 시작!' : '스페이스 / 엔터 / 클릭으로 시작!') : '', 25, '#d0708a', 0],
   ], 70, 400);
 }
 
@@ -736,7 +836,7 @@ function drawEnd(){
     [win, 34, winners.length > 1 ? '#e0708a' : winners[0].color, 58],
     [pets.map((p,i) => `${p.name} ${result[i]}점`).join('   ·   '), 23, '#5a4636', 46],
     [`셋이 함께 ${total}점만큼 신나게 놀았어요 ♥`, 20, '#8a6a55', 70],
-    [Math.sin(time*4) > -0.3 ? '스페이스 / 엔터 / 클릭으로 다시 놀기' : '', 24, '#d0708a', 0],
+    [Math.sin(time*4) > -0.3 ? (isTouch ? '화면을 터치해서 다시 놀기' : '스페이스 / 엔터 / 클릭으로 다시 놀기') : '', 24, '#d0708a', 0],
   ], 90, 350);
 }
 
@@ -750,7 +850,7 @@ function draw(){
   for (const p of pets) drawLabel(p);
   if (state === 'play') drawHUD();
   ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic'; ctx.font = `12px ${FONT}`; ctx.fillStyle = 'rgba(90,70,54,.6)';
-  ctx.fillText(muted ? 'M: 소리 켜기' : 'M: 소리 끄기', W-12, H-8);
+  if (!isTouch) ctx.fillText(muted ? 'M: 소리 켜기' : 'M: 소리 끄기', W-12, H-8);
   if (state === 'title') drawTitle();
   if (state === 'end') drawEnd();
 }
