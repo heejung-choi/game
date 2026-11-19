@@ -1,0 +1,5 @@
+# secrets
+.env
+
+# raw scraped data
+data/raw/
