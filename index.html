@@ -97,14 +97,14 @@ function resetPets(){
       keys:{l:'KeyA', r:'KeyD', u:'KeyW', d:'KeyS'}, color:'#5c7c9a',
       lines:{fish:['냠냠!','생선 최고'], yarn:['데굴데굴~','실뭉치다!'], mouse:['잡았다!','오빠가 잡았지'], churu:['츄르다!!','츄르는 못 참지'], laser:['빨간 점!','오빠가 먼저!']},
       boop:{'솜':['우리 솜이 ♥','솜아 놀자!'], '토리':['토리야 ♥','우리 막내~']}}),
-    makePet({name:'솜', tag:'동생', kind:'devon', outline:'#b08a68', x:720, size:0.96, speed:300, jump:790, pitch:1.3, sx:720,
+    makePet({name:'솜', tag:'동생', kind:'devon', outline:'#a9a39b', x:720, size:0.96, speed:300, jump:790, pitch:1.3, sx:720,
       keys:{l:'ArrowLeft', r:'ArrowRight', u:'ArrowUp', d:'ArrowDown'}, color:'#d0708a',
       lines:{fish:['냠!','맛있다냥'], yarn:['실이다~','데굴~'], mouse:['내 거야!','잡았당'], churu:['츄르!!!','츄르 최고♥'], laser:['반짝반짝!','잡았다냥!']},
       boop:{'구름':['오빠 ♥','구름 오빠~'], '토리':['토리야 놀자!','막내 귀여워 ♥']}}),
     makePet({name:'토리', tag:'막내', kind:'dog', outline:'#b8875a', x:480, size:0.92, speed:280, jump:700, pitch:1.1, sx:480,
       keys:{l:'KeyJ', r:'KeyL', u:'KeyI', d:'KeyK'}, color:'#d9893b',
       lines:{fish:['냠냠멍!','생선도 좋아'], yarn:['물어왔다!','왈왈!'], mouse:['삑삑이다!','잡았다멍!'], churu:['간식이다멍!','나도 츄르!!'], laser:['반짝이 잡았다!','왈!']},
-      boop:{'구름':['구름이 좋아 ♥','같이 놀자멍!'], '솜':['솜이 좋아 ♥','꼬리 살랑살랑']}}),
+      boop:{'구름':['구름이 형 ♥','형아 놀자멍!'], '솜':['솜이 누나 ♥','누나 좋아멍!']}}),
   ];
   for (const p of pets){ p.y = FLOOR; p.dir = p.x < W/2 ? 1 : -1; }
 }
@@ -143,7 +143,7 @@ function startGame(){
   laser.on = false; laser.next = 6;
   for (const p of pets){ p.score = 0; p.vx = p.vy = 0; p.y = FLOOR; p.x = p.sx; p.tgt = null; p.dir = p.x < W/2 ? 1 : -1; }
   for (let i=0;i<5;i++) spawnItem();
-  say(pets[0], '다 같이 놀자!'); say(pets[1], '오빠 좋아!'); say(pets[2], '나도 나도!');
+  say(pets[0], '다 같이 놀자!'); say(pets[1], '오빠 좋아!'); say(pets[2], '형아 누나 놀자!');
   meow(pets[1].pitch); setTimeout(() => bark(pets[2].pitch), 300);
 }
 
@@ -330,6 +330,18 @@ function update(dt){
 function rr(x,y,w,h,r){ ctx.beginPath(); ctx.roundRect(x,y,w,h,r); }
 function circ(x,y,r){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); }
 function oval(x,y,rx,ry,rot=0){ ctx.beginPath(); ctx.ellipse(x,y,rx,ry,rot,0,Math.PI*2); ctx.fill(); }
+// 입체 음영: 왼쪽 위에서 빛이 비치도록 밝은 면 → 기본색 → 그늘
+let LDIR = 1;
+function tint(h, a){
+  const n = parseInt(h.slice(1),16), c = [n>>16, n>>8&255, n&255];
+  const f = v => Math.round(a > 0 ? v + (255-v)*a : v*(1+a));
+  return `rgb(${f(c[0])},${f(c[1])},${f(c[2])})`;
+}
+function vol(cx, cy, r, col){
+  const g = ctx.createRadialGradient(cx - r*0.35*LDIR, cy - r*0.45, r*0.08, cx, cy, r*1.15);
+  g.addColorStop(0, tint(col, 0.55)); g.addColorStop(0.45, col); g.addColorStop(1, tint(col, -0.3));
+  return g;
+}
 
 function drawRoom(){
   let g = ctx.createLinearGradient(0,0,0,FLOOR);
@@ -458,8 +470,13 @@ function drawEye(x, y, r, iris, mode){
     ctx.strokeStyle = '#3a2a2a'; ctx.lineWidth = 2; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(x-r, y); ctx.quadraticCurveTo(x, y+r*0.6, x+r, y); ctx.stroke(); return;
   }
-  ctx.fillStyle = '#2a1f1f'; oval(x, y, r, r*1.12);
-  if (iris){ ctx.fillStyle = iris; oval(x, y+r*0.1, r*0.82, r*0.92); ctx.fillStyle = '#1d1515'; oval(x+r*0.08, y+r*0.1, r*0.45, r*0.7); }
+  const eg = ctx.createRadialGradient(x - r*0.3, y - r*0.4, 0, x, y, r*1.2);
+  eg.addColorStop(0,'#5a4848'); eg.addColorStop(1,'#120c0c');
+  ctx.fillStyle = eg; oval(x, y, r, r*1.12);
+  if (iris){
+    const ig = ctx.createLinearGradient(0, y-r, 0, y+r);
+    ig.addColorStop(0, tint(iris,-0.45)); ig.addColorStop(0.55, iris); ig.addColorStop(1, tint(iris,0.45));
+    ctx.fillStyle = ig; oval(x, y+r*0.1, r*0.82, r*0.92); ctx.fillStyle = '#1d1515'; oval(x+r*0.08, y+r*0.1, r*0.45, r*0.7); }
   ctx.fillStyle = '#fff'; circ(x-r*0.32, y-r*0.38, r*0.36); circ(x+r*0.35, y+r*0.38, r*0.16);
 }
 function drawFace(c, hx, hy, opts){
@@ -471,6 +488,7 @@ function drawFace(c, hx, hy, opts){
   // 코 + ω 입
   const nx = hx+opts.nx, ny = hy+opts.ny;
   ctx.fillStyle = opts.nose; oval(nx, ny, opts.nr*1.2, opts.nr*0.85);
+  ctx.fillStyle = 'rgba(255,255,255,.65)'; oval(nx - opts.nr*0.4, ny - opts.nr*0.3, opts.nr*0.42, opts.nr*0.25);
   ctx.strokeStyle = '#6a4545'; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(nx, ny+opts.nr*0.7);
   ctx.quadraticCurveTo(nx-1, ny+5, nx-4, ny+4.5); ctx.moveTo(nx, ny+opts.nr*0.7); ctx.quadraticCurveTo(nx+1, ny+5, nx+4, ny+4.5); ctx.stroke();
@@ -481,7 +499,12 @@ function drawFace(c, hx, hy, opts){
 
 function drawPet(c){
   const s = c.size;
-  if (c.onGround){ ctx.fillStyle = 'rgba(0,0,0,.15)'; oval(c.x, c.y+2, 26*s, 5); }
+  if (c.onGround){
+    const sg = ctx.createRadialGradient(c.x, c.y+2, 0, c.x, c.y+2, 28*s);
+    sg.addColorStop(0,'rgba(60,35,20,.32)'); sg.addColorStop(1,'rgba(60,35,20,0)');
+    ctx.fillStyle = sg; oval(c.x, c.y+2, 28*s, 6);
+  }
+  LDIR = c.dir;
   const moving = c.onGround && Math.abs(c.vx) > 25, air = !c.onGround;
   const sq = c.squash, breathe = moving || air ? 0 : Math.sin(time*2.4 + c.seed)*0.025;
   // 따로 그린 다음 부드러운 테두리를 둘러서 밝은 배경에서도 잘 보이게
@@ -507,13 +530,14 @@ function legs(list, st, w, len, col1, col2, paw){
     if (st.air){ sw = lx < 0 ? -7 : 7; ly = -2; }
     ctx.strokeStyle = back ? col2 : col1; ctx.lineWidth = w;
     ctx.beginPath(); ctx.moveTo(lx, -len-st.bob); ctx.lineTo(lx+sw, -w/2+ly); ctx.stroke();
-    ctx.fillStyle = back ? col2 : paw; oval(lx+sw+1, -w/2+1+ly, w*0.62, w*0.45);
+    if (!back){ ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = w*0.3; ctx.beginPath(); ctx.moveTo(lx-w*0.18, -len-st.bob+2); ctx.lineTo(lx+sw-w*0.18, -w/2+ly-1); ctx.stroke(); }
+    ctx.fillStyle = vol(lx+sw+1, -w/2+ly, w*0.62, back ? col2 : paw); oval(lx+sw+1, -w/2+1+ly, w*0.62, w*0.45);
   }
 }
 
 function drawCat(c, st){
   const ash = c.kind === 'ash', bob = st.bob;
-  const base = ash ? '#bfc4cb' : '#f5e7d6', back = ash ? '#a3a9b1' : '#e6d1b8', dark = ash ? '#3a3e45' : '#cfae88', belly = ash ? '#eceef1' : '#fffaf3';
+  const base = ash ? '#bfc4cb' : '#fbfaf7', back = ash ? '#a3a9b1' : '#e4e0db', dark = ash ? '#3a3e45' : '#d3cdc6', belly = ash ? '#eceef1' : '#ffffff';
 
   // 꼬리 (살랑살랑)
   const tw = Math.sin(time*(ash?3:4.5) + c.seed)*7;
@@ -521,15 +545,15 @@ function drawCat(c, st){
   ctx.beginPath(); ctx.moveTo(-20,-22-bob);
   if (st.air) ctx.quadraticCurveTo(-40,-24,-50,-34+tw*0.4);
   else ctx.bezierCurveTo(-40,-24-bob, -30+tw*0.3,-52, -40+tw*0.6,-58+tw*0.3);
-  ctx.strokeStyle = base; ctx.lineWidth = ash ? 10 : 7; ctx.stroke();
+  ctx.strokeStyle = tint(base, -0.12); ctx.lineWidth = ash ? 10 : 7; ctx.stroke();
   if (ash){ ctx.strokeStyle = '#6b717b'; ctx.setLineDash([4,6]); ctx.stroke(); ctx.setLineDash([]); }
 
   // 다리 (짧고 통통)
   legs([[-15,0,true],[15,Math.PI,true],[-7,Math.PI,false],[10,0,false]], st, ash?10:9, 16, base, back, belly);
 
   // 몸통 (동글동글)
-  ctx.fillStyle = base; oval(-1,-22-bob, ash?25:23, ash?16:15);
-  ctx.fillStyle = belly; oval(5,-15-bob,15,7);
+  ctx.fillStyle = vol(-1,-22-bob, ash?25:23, base); oval(-1,-22-bob, ash?25:23, ash?16:15);
+  ctx.fillStyle = vol(5,-17-bob,14,belly); oval(5,-15-bob,15,7);
   if (ash){
     ctx.strokeStyle = 'rgba(70,75,85,.55)'; ctx.lineWidth = 5;
     ctx.beginPath(); ctx.moveTo(-21,-31-bob); ctx.quadraticCurveTo(-3,-41-bob,15,-35-bob); ctx.stroke();
@@ -555,23 +579,24 @@ function drawCat(c, st){
       ctx.moveTo(hx+x1+4,hy-12); ctx.quadraticCurveTo(hx+x3,hy+y3+12,hx+x3+0.5,hy+y3+15); ctx.quadraticCurveTo(hx+x3+2,hy+y3+12,hx+x2-4,hy-13); ctx.fill();
     }
   }
-  ctx.fillStyle = base; oval(hx, hy, hr+(ash?2:0), hr);
+  ctx.fillStyle = 'rgba(40,30,30,.16)'; oval(hx-5, hy+15, 15, 6);   // 머리 아래 그림자
+  ctx.fillStyle = vol(hx, hy, hr+2, base); oval(hx, hy, hr+(ash?2:0), hr);
   if (ash){
     // 통통한 볼 털 + 이마 M자
     ctx.beginPath(); ctx.moveTo(hx-16,hy+6); ctx.lineTo(hx-22,hy+10); ctx.lineTo(hx-14,hy+12); ctx.fill();
     ctx.strokeStyle = 'rgba(70,75,85,.55)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
     for (const fx of [-1,4,9]){ ctx.beginPath(); ctx.moveTo(hx+fx,hy-17); ctx.lineTo(hx+fx+0.5,hy-11); ctx.stroke(); }
     ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(hx-17,hy-1); ctx.quadraticCurveTo(hx-12,hy-2,hx-8,hy+1); ctx.stroke();
-    ctx.fillStyle = belly; oval(hx+9,hy+8,10,6.5);
+    ctx.fillStyle = vol(hx+9,hy+6,10,belly); oval(hx+9,hy+8,10,6.5);
   } else {
     // 접힌 귀 (폴드)
-    ctx.fillStyle = back; ctx.strokeStyle = dark; ctx.lineWidth = 1.4;
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.4;
     for (const [ex,rot] of [[hx-8,-0.45],[hx+9,0.35]]){
-      ctx.save(); ctx.translate(ex,hy-16); ctx.rotate(rot);
+      ctx.save(); ctx.translate(ex,hy-16); ctx.rotate(rot); ctx.fillStyle = vol(0,-2,9,back);
       ctx.beginPath(); ctx.moveTo(-8,1); ctx.quadraticCurveTo(0,-10,8,1); ctx.quadraticCurveTo(0,4,-8,1); ctx.fill(); ctx.stroke();
       ctx.restore();
     }
-    ctx.fillStyle = belly; oval(hx+9,hy+9,9,6);
+    ctx.fillStyle = vol(hx+9,hy+7,9,belly); oval(hx+9,hy+9,9,6);
     ctx.strokeStyle = dark; ctx.lineWidth = 1.3;
     ctx.beginPath(); ctx.arc(hx-8,hy-6,3,0.3,Math.PI-0.3); ctx.stroke();
     ctx.beginPath(); ctx.arc(hx+2,hy-14,2.5,0.3,Math.PI-0.3); ctx.stroke();
@@ -580,13 +605,13 @@ function drawCat(c, st){
     ? {ex1:2, ex2:13, ey:-1, er:5.4, iris:'#8bc34a', nx:17.5, ny:5, nr:2.3, nose:'#f08ea2'}
     : {ex1:2, ex2:13, ey:-1, er:6.6, iris:'#62b8ea', nx:17.5, ny:6, nr:2.1, nose:'#f2a0b0'});
   // 수염
-  ctx.strokeStyle = ash ? 'rgba(255,255,255,.95)' : 'rgba(160,125,95,.7)'; ctx.lineWidth = 0.9;
+  ctx.strokeStyle = ash ? 'rgba(255,255,255,.95)' : 'rgba(165,155,145,.8)'; ctx.lineWidth = 0.9;
   const wl = ash ? 14 : 8;
   for (const wy of [-1,2,5]){ ctx.beginPath(); ctx.moveTo(hx+18,hy+7); ctx.quadraticCurveTo(hx+18+wl*0.6,hy+7+wy*0.8+(ash?0:-3),hx+18+wl,hy+7+wy*1.6); ctx.stroke(); }
 }
 
 function fluff(cx, cy, rx, ry, n, r, col){
-  ctx.fillStyle = col;
+  ctx.fillStyle = vol(cx, cy, Math.max(rx, ry) + r, col);
   for (let i=0;i<n;i++){ const a = i/n*Math.PI*2; circ(cx+Math.cos(a)*rx, cy+Math.sin(a)*ry, r); }
   oval(cx, cy, rx, ry);
 }
@@ -622,7 +647,8 @@ function drawDog(c, st){
 
   // 머리
   const hx = 21, hy = -42 - bob;
-  ctx.fillStyle = ear; oval(hx+10, hy-6, 6, 10, -0.5);  // 뒤쪽 귀
+  ctx.fillStyle = 'rgba(40,30,30,.15)'; oval(hx-4, hy+14, 14, 6);
+  ctx.fillStyle = tint(ear, -0.18); oval(hx+10, hy-6, 6, 10, -0.5);  // 뒤쪽 귀
   fluff(hx, hy, 15, 14, 12, 6.5, base);
   fluff(hx-2, hy-17, 5, 3, 5, 4.5, base);               // 정수리 뭉게털
   curls(hx-4, hy-6, 10, 8, 4, 'rgba(214,168,118,.5)');
@@ -632,7 +658,7 @@ function drawDog(c, st){
   curls(0, 4, 4, 8, 3, 'rgba(190,130,80,.5)');
   ctx.restore();
   // 주둥이
-  ctx.fillStyle = '#fff4e6'; oval(hx+11, hy+6, 9, 7);
+  ctx.fillStyle = vol(hx+11, hy+4, 9, '#fff4e6'); oval(hx+11, hy+6, 9, 7);
   drawFace(c, hx, hy, {ex1:3, ex2:13, ey:-2, er:5, iris:null, nx:19, ny:4, nr:3.4, nose:'#2a1f1f', tongue:true});
 }
 
